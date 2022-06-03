@@ -57,6 +57,7 @@ class rotate_ : public hittable {
             ax = radians(ax); ay =radians(ay); az = radians(az);
             sinx = sin(ax);siny = sin(ay);sinz = sin(az);
             cosx = cos(ax);cosy = cos(ay);cosz = cos(az);
+            bbox = ptr->bounding_box();
             vec3 min(inf), max(-inf);
              for (int i = 0; i < 2; i++) {
                 for (int j = 0; j < 2; j++) {

@@ -22,7 +22,9 @@ struct mesh{
 //basic model loading without materials or textures;
 class model{
 public:
-    model(const std::string &path){
+    model(const std::string &path, double scale_ = 1.0, std::shared_ptr<material> mat = make_shared<lambertian>(vec3(0)) )
+        : scale(scale_), mtr(mat)
+    {
         Assimp::Importer import;
         const aiScene *scene = import.ReadFile(path, aiProcess_Triangulate);
         if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
@@ -36,13 +38,17 @@ public:
     }
     hittable_list getHittableList(){
         hittable_list triangles;
-        auto shade = vec3(0.8, 0.85, 0.88);
         for(auto m: meshes){
             for(int i = 0; i<m.indices.size(); i+=3){
-                triangles.add(std::make_shared<triangle>(7*m.vertices[m.indices[i+0]],
-                                                         7*m.vertices[m.indices[i+1]],
-                                                         7*m.vertices[m.indices[i+2]],
-                                                         std::make_shared<metal>(shade)));
+                triangles.add(std::make_shared<rotate_>(std::make_shared<triangle>
+                    (
+                    scale*m.vertices[m.indices[i+0]],
+                    scale*m.vertices[m.indices[i+1]],
+                    scale*m.vertices[m.indices[i+2]],
+                    mtr
+                    ),
+                    0, 80, 0
+                ));
             }
         }
         return triangles;
@@ -50,6 +56,8 @@ public:
 private:
     std::string directory;
     std::vector<mesh> meshes;
+    std::shared_ptr<material> mtr;
+    double scale;
     
     void processNode(aiNode *node, const aiScene *scene){
         for(int i=0;i<node->mNumMeshes;i++){

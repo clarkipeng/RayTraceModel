@@ -1,0 +1,8 @@
+﻿  main.cpp
+C:\Users\clark\Documents\C++\RayTraceModel\RayTraceModel\triangle.h(21,1): warning C4305: 'initializing': truncation from 'double' to 'float'
+C:\Users\clark\Documents\C++\RayTraceModel\RayTraceModel\model.h(63,22): warning C4018: '<': signed/unsigned mismatch
+C:\Users\clark\Documents\C++\RayTraceModel\RayTraceModel\model.h(67,22): warning C4018: '<': signed/unsigned mismatch
+C:\Users\clark\Documents\C++\RayTraceModel\RayTraceModel\model.h(76,22): warning C4018: '<': signed/unsigned mismatch
+C:\Users\clark\Documents\C++\RayTraceModel\RayTraceModel\model.h(84,26): warning C4018: '<': signed/unsigned mismatch
+C:\Users\clark\Documents\C++\RayTraceModel\RayTraceModel\model.h(87,30): warning C4018: '<': signed/unsigned mismatch
+  RayTraceModel.vcxproj -> C:\Users\clark\Documents\C++\RayTraceModel\x64\Debug\RayTraceModel.exe

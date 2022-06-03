@@ -40,7 +40,6 @@ class vec3 {
         double length() const {
             return sqrt(length_squared());
         }
-
         double length_squared() const {
             return e[0]*e[0] + e[1]*e[1] + e[2]*e[2];
         }
@@ -54,6 +53,9 @@ class vec3 {
             // Return true if the vector is close to zero in all dimensions.
             const auto s = 1e-8;
             return (fabs(e[0]) < s) && (fabs(e[1]) < s) && (fabs(e[2]) < s);
+        }
+        bool hasNaN() const {
+            return (e[0] != e[0]) || (e[1] != e[1]) || (e[2] != e[2]);
         }
         
 

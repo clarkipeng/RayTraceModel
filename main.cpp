@@ -32,20 +32,22 @@ void simple_triangle(hittable_list &world, std::shared_ptr<hittable_list> &light
     lights->add(make_shared<xy_rect>(-5,5,-5,5,10, shared_ptr<material>()));
 }
 void test(hittable_list &world, std::shared_ptr<hittable_list> &lights){
-    
-    model m("backpack/backpack.obj");
+    shared_ptr<material> aluminum = make_shared<metal>(vec3(0.8, 0.85, 0.88), 0.0);
+    model m("backpack/backpack.obj", 60.0, aluminum);
     world = m.getHittableList();
     auto red   = make_shared<lambertian>(vec3(.65, .05, .05));
     auto white = make_shared<lambertian>(vec3(.73, .73, .73));
     auto green = make_shared<lambertian>(vec3(.12, .45, .15));
-    auto light = make_shared<diffuse_light>(vec3(15, 15, 15));
-    world.add(make_shared<yz_rect>(0-270, 555-270, 0, 555, 555-270, green));
-    world.add(make_shared<yz_rect>(0-270, 555-270, 0, 555, 0-270, red));
-    world.add(make_shared<flip_face>(make_shared<xz_rect>(213-270, 343-270, 227, 332, 554-270, light)));
-    lights->add(make_shared<xz_rect>(213-270, 343-270, 227, 332, 554-270, shared_ptr<material>()));
-    world.add(make_shared<xz_rect>(0-270, 555-270, 0, 555, 0-270, white));
-    world.add(make_shared<xz_rect>(0-270, 555-270, 0, 555, 555-270, white));
-    world.add(make_shared<xy_rect>(0-270, 555-270, 0-270, 555-270, 555, white));
+    auto blue = make_shared<lambertian>(vec3(.12, .15, .45));
+    auto light1 = make_shared<diffuse_light>(vec3(15, 15, 15));
+    world.add(make_shared<yz_rect>(-273, 273, -273, 273, 273, green));
+    world.add(make_shared<yz_rect>(-273, 273, -273, 273, -273, red));
+    world.add(make_shared<flip_face>(make_shared<xz_rect>(-60, 60, -50, 50, 273, light1)));
+    world.add(make_shared<xy_rect>(-273, 273, -273, 273, -273, blue));
+    lights->add(make_shared<xz_rect>(-60, 60, -50, 50, 84, shared_ptr<material>()));
+    world.add(make_shared<xz_rect>(-273, 273, -273, 273, -273, white));
+    world.add(make_shared<xz_rect>(-273, 273, -273, 273, 273, white));
+    world.add(make_shared<xy_rect>(-273, 273, -273, 273, 273, white));
     
 }
 void final_scene(hittable_list &world, std::shared_ptr<hittable_list> &lights){
@@ -285,36 +287,41 @@ vec3 ray_color(const ray& r, const vec3& background, const hittable& world,
            srec.attenuation * rec.mat_ptr->scattering_pdf(r, rec, scattered) 
                   * ray_color(scattered, background, world, lights, dep-1)/ pdfv;
 }
-
+int nancount = 0;
 vec3 ray_color(const ray& r, const vec3& background, const bvh_node& node,
     shared_ptr<hittable> &lights,  int dep) {
     hit_record rec;
-    if(dep==0){
+    if(dep==0)
         return vec3(0,0,0);
-    }
     
-    if (!node.hit(r, interval(0.001, inf), rec)) {
+    if (!node.hit(r, interval(0.001, inf), rec)) 
         return background;
-    }
+    
+    vec3 next;
     scatter_record srec;
     vec3 emitted = rec.mat_ptr->emitted(r, rec, rec.u, rec.v, rec.p);
-
     if(!rec.mat_ptr->scatter(r, rec, srec))
         return emitted;
     
     if(srec.is_specular){
-        return srec.attenuation * ray_color(srec.specular_ray, background, node, lights, dep-1);
+        next = srec.attenuation * ray_color(srec.specular_ray, background, node, lights, dep-1);
     }
-    auto light_ptr = make_shared<hittable_pdf>(lights, rec.p);
-    mixture_pdf p(light_ptr, srec.pdf_ptr);
-    ray scattered(rec.p, p.generate(), r.time());
-    double pdfv = p.value(scattered.direction());
-    return emitted + 
-           srec.attenuation
+    else {
+        auto light_ptr = make_shared<hittable_pdf>(lights, rec.p);
+        mixture_pdf p(light_ptr, srec.pdf_ptr);
+        ray scattered(rec.p, p.generate(), r.time());
+        double pdfv = p.value(scattered.direction());
+
+        next = emitted +
+            srec.attenuation
             * rec.mat_ptr->scattering_pdf(r, rec, scattered)
-            * ray_color(scattered, background, node, lights, dep-1)
+            * ray_color(scattered, background, node, lights, dep - 1)
             / pdfv;
-    
+    }
+    if (next.hasNaN())
+        nancount++;
+        return vec3(0);
+    return next;
 }
 
 void multitreading_render();
@@ -420,7 +427,7 @@ int main() {
             simple_triangle(world, lights);
             aspect_ratio = 1.0;
             nx = 100;
-            ns = 300;
+            ns = 50;
             background = vec3(0.5);
             lookfrom = vec3(0, 0, 5);
             lookat = vec3(0,0,0);
@@ -430,12 +437,12 @@ int main() {
         case 10:
             test(world, lights);
             aspect_ratio = 1.0;
-            nx = 200;
-            ns = 300;
+            nx = 400;
+            ns = 500;
             background = vec3(0,0,0);
-            lookfrom = vec3(0, 0, -80);
+            lookfrom = vec3(+270, +270, +270);
             lookat = vec3(0,0,0);
-            vfov = 40.0;
+            vfov = 70.0;
             break;
     }
     ny = static_cast<int>(nx / aspect_ratio);
@@ -454,6 +461,7 @@ int main() {
     // render();
     int t =((int)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - blockTime.first).count());
     std::cerr << "\nDone: execution time "<<t<<std::endl;
+    std::cerr <<nancount<< std::endl;
     // std::cerr<< (double)cntnan/total<<std::endl;
 }
 int done = 0;
@@ -484,7 +492,8 @@ void threadrun(int start, int end){
     // std::cerr<<"THREAD DONE"<<std::endl;
 }
 void multitreading_render(){
-    const int numthreads = std::thread::hardware_concurrency();
+    int numthreads = std::thread::hardware_concurrency();
+    numthreads -= 2;
     std::vector<std::thread> threads(numthreads);
     std::cerr<<"NUMTHREADS "<<numthreads<<std::endl;
     for(int t=0;t<numthreads;t++){

@@ -25,20 +25,16 @@ class triangle : public hittable{
             e2 = c-a;
             pvec = cross(r.direction(),e2);
             det = dot(e1, pvec);
+            inv_det = 1 / det;
             if(fabs(det) < EPSILON) return 0;
             tvec = r.origin()-a;
-            u = dot(tvec, pvec);
-            if(u < 0.0 || u > det) return 0;
+            u = inv_det * dot(tvec, pvec);
+            if(u < 0.0 || u > 1) return 0;
             qvec = cross(tvec, e1);
-            v = dot(r.direction(), qvec);
-            if(v < 0.0 || v+u > det) return 0;
+            v = inv_det * dot(r.direction(), qvec);
+            if(v < 0.0 || v+u > 1) return 0;
             
-            double t = dot(e2,qvec);
-            
-            inv_det = 1/det;
-            u *= inv_det;
-            v *= inv_det;
-            t *= inv_det;
+            double t = inv_det * dot(e2,qvec);
             
             if(!ray_t.contains(t))return 0;
             
