@@ -9,4 +9,4 @@ This code uses multithreading and bounding volume hierarchies(bvhs) in order to 
 
 Some rendered images I made can be found in the "good images" folder.
 
-After using probability distribution functions(pdfs) to optimize light calculations some materials in the material.h file may no longer be functional.
+After using probability distribution functions(pdfs) to optimize light calculations, some materials in the material.h file may no longer be functional.
