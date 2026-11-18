@@ -31,18 +31,21 @@ void write_color(std::ostream &out, vec3 pixel_color, int samples_per_pixel) {
         << static_cast<int>(256 * intensity.clamp(g)) << ' '
         << static_cast<int>(256 * intensity.clamp(b)) << '\n';
 }
+void write_image_to(std::ostream &out, uint8_t *image, int nx, int ny) {
+    out << "P3\n" << nx << " " << ny << "\n255\n";
+    for (int j = ny-1; j >= 0; j--) {
+        for (int i = 0; i < nx; ++i) {
+            out << static_cast<int>(image[3*(j*nx+i)+0]) << ' ';
+            out << static_cast<int>(image[3*(j*nx+i)+1]) << ' ';
+            out << static_cast<int>(image[3*(j*nx+i)+2]) << '\n';
+        }
+    }
+}
 void write_image(uint8_t *image, int nx, int ny) {
     if (!fout.is_open())
     {
         std::cerr << "FILE NOT OPENED" << std::endl;
     }
-   fout << "P3\n" << nx << " " << ny << "\n255\n";
-    for (int j = ny-1; j >= 0; j--) {
-        for (int i = 0; i < nx; ++i) {
-            fout << static_cast<int>(image[3*(j*nx+i)+0]) << ' ';
-            fout << static_cast<int>(image[3*(j*nx+i)+1]) << ' ';
-            fout << static_cast<int>(image[3*(j*nx+i)+2]) << '\n';
-        }
-    }
+    write_image_to(fout, image, nx, ny);
 }
 #endif

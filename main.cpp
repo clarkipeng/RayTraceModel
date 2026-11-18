@@ -318,9 +318,10 @@ vec3 ray_color(const ray& r, const vec3& background, const bvh_node& node,
             * ray_color(scattered, background, node, lights, dep - 1)
             / pdfv;
     }
-    if (next.hasNaN())
+    if (next.hasNaN()) {
         nancount++;
         return vec3(0);
+    }
     return next;
 }
 
@@ -341,8 +342,12 @@ camera cam;
 bvh_node node;
 shared_ptr<hittable_list> lights = make_shared<hittable_list>();
 std::vector<uint8_t> image;
+std::vector<double> accum; // running sum of samples per pixel, for progressive frames
+int frames = 1, passSamples, samplesSoFar = 0;
 
-int main() {
+int main(int argc, char **argv) {
+    int scene = argc > 1 ? atoi(argv[1]) : 0;
+    if (argc > 2) frames = std::max(1, atoi(argv[2]));
     // Image
     aspect_ratio = 16.0 / 9.0;
     nx = 300;
@@ -356,7 +361,7 @@ int main() {
     vfov= 40.0;
     // World
     background = vec3(0,0,0);
-    switch (0) {
+    switch (scene) {
         case 1:
             world = random_scene();
             background = vec3(0.70, 0.80, 1.00);
@@ -445,6 +450,9 @@ int main() {
             vfov = 70.0;
             break;
     }
+    // ./raytrace [scene] [frames] [width] [samples]: optional overrides of the scene's size and sample count.
+    if (argc > 3) nx = atoi(argv[3]);
+    if (argc > 4) ns = atoi(argv[4]);
     ny = static_cast<int>(nx / aspect_ratio);
 
     std::cerr<<"GEN BVH"<<std::endl;
@@ -469,14 +477,18 @@ void threadrun(int start, int end){
     // std::cerr<<"THREAD RAN"<<std::endl;
     for(int j=start ;j<end ;j++){
         for (int i = 0; i < nx; i++) {
-            vec3 col(0.0);
-            for (int s=0; s < ns; s++) {
+            vec3 sum(0.0);
+            for (int s=0; s < passSamples; s++) {
                 float u = float(i + random_double()) / float(nx);
                 float v = float(j + random_double()) / float(ny);
                 ray r = cam.get_ray(u, v);
-                col += ray_color(r, background, node, lights, mxdepth);
+                vec3 c = ray_color(r, background, node, lights, mxdepth);
+                if (!c.hasNaN()) sum += c;
             }
-            col /= float(ns);
+            double *acc = &accum[3*(j*nx+i)];
+            acc[0] += sum[0]; acc[1] += sum[1]; acc[2] += sum[2];
+            int n = samplesSoFar + passSamples;
+            vec3 col(acc[0] / n, acc[1] / n, acc[2] / n);
             col = vec3( sqrt(col[0]), sqrt(col[1]), sqrt(col[2]) );
             if (col[0] != col[0]) col[0] = 0.0;
             if (col[1] != col[1]) col[1] = 0.0;
@@ -491,7 +503,31 @@ void threadrun(int start, int end){
     }
     // std::cerr<<"THREAD DONE"<<std::endl;
 }
+void render_pass();
 void multitreading_render(){
+    accum.assign(3*nx*ny, 0.0);
+    // frames == 1: one pass of ns samples, the original still.
+    if (frames == 1) { passSamples = ns; render_pass(); write_image(&image[0], nx, ny); return; }
+    // Otherwise: one sample per pixel per pass, saving the running average at `frames` checkpoints
+    // spaced on a log scale from 1 to ns samples, so the GIF shows the noise clearing.
+    passSamples = 1;
+    int saved = 0, written = 0; // checkpoints reached, frames written
+    while (samplesSoFar < ns) {
+        render_pass();
+        samplesSoFar += passSamples;
+        int checkpoint = (int)std::round(std::exp(std::log((double)ns) * saved / (frames - 1)));
+        if (samplesSoFar < checkpoint && samplesSoFar < ns) continue;
+        char name[64];
+        snprintf(name, sizeof name, "frames/frame_%04d.ppm", written++);
+        std::ofstream out(name);
+        write_image_to(out, &image[0], nx, ny);
+        std::cerr << "\nframe " << written << " (" << samplesSoFar << " spp)" << std::endl;
+        saved++;
+        while (saved < frames && (int)std::round(std::exp(std::log((double)ns) * saved / (frames - 1))) <= samplesSoFar) saved++;
+    }
+}
+void render_pass(){
+    done = 0;
     int numthreads = std::thread::hardware_concurrency();
     numthreads -= 2;
     std::vector<std::thread> threads(numthreads);
@@ -505,7 +541,6 @@ void multitreading_render(){
     for (int t = 0; t < numthreads; ++t) {
         threads[t].join();
     }
-    write_image(&image[0], nx, ny);
 }
 void render(){
     std::cout << "P3\n" << nx << ' ' << ny << "\n255\n";
