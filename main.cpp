@@ -31,7 +31,10 @@ void simple_triangle(hittable_list &world, std::shared_ptr<hittable_list> &light
     world.add(make_shared<flip_face>(make_shared<xy_rect>(-5,5,-5,5,10, light)));
     lights->add(make_shared<xy_rect>(-5,5,-5,5,10, shared_ptr<material>()));
 }
+double anim_t = -1; // animation time in [0, 1]; negative when not animating
 void test(hittable_list &world, std::shared_ptr<hittable_list> &lights){
+    // While animating, the ceiling light slides across the room so reflections and shadows sweep.
+    double dx = anim_t >= 0 ? (anim_t - 0.5) * 240 : 0;
     shared_ptr<material> aluminum = make_shared<metal>(vec3(0.8, 0.85, 0.88), 0.0);
     model m("backpack/backpack.obj", 60.0, aluminum);
     world = m.getHittableList();
@@ -42,9 +45,9 @@ void test(hittable_list &world, std::shared_ptr<hittable_list> &lights){
     auto light1 = make_shared<diffuse_light>(vec3(15, 15, 15));
     world.add(make_shared<yz_rect>(-273, 273, -273, 273, 273, green));
     world.add(make_shared<yz_rect>(-273, 273, -273, 273, -273, red));
-    world.add(make_shared<flip_face>(make_shared<xz_rect>(-60, 60, -50, 50, 273, light1)));
+    world.add(make_shared<flip_face>(make_shared<xz_rect>(-60 + dx, 60 + dx, -50, 50, 273, light1)));
     world.add(make_shared<xy_rect>(-273, 273, -273, 273, -273, blue));
-    lights->add(make_shared<xz_rect>(-60, 60, -50, 50, 84, shared_ptr<material>()));
+    lights->add(make_shared<xz_rect>(-60 + dx, 60 + dx, -50, 50, 84, shared_ptr<material>()));
     world.add(make_shared<xz_rect>(-273, 273, -273, 273, -273, white));
     world.add(make_shared<xz_rect>(-273, 273, -273, 273, 273, white));
     world.add(make_shared<xy_rect>(-273, 273, -273, 273, 273, white));
@@ -326,6 +329,7 @@ vec3 ray_color(const ray& r, const vec3& background, const bvh_node& node,
 }
 
 void multitreading_render();
+void render_pass();
 void render();
 
 double aspect_ratio;
@@ -455,6 +459,32 @@ int main(int argc, char **argv) {
     if (argc > 4) ns = atoi(argv[4]);
     ny = static_cast<int>(nx / aspect_ratio);
 
+    // ./raytrace 10 1 [width] [samples] [anim_frames]: a slow push-in while the light slides, one
+    // converged frame per time step, written to frames/anim_NNNN.ppm (make-mp4.sh plays them).
+    int animFrames = argc > 5 ? atoi(argv[5]) : 0;
+    if (animFrames > 1 && scene == 10) {
+        image.resize(3*nx*ny);
+        vec3 start = lookfrom;
+        for (int f = 0; f < animFrames; f++) {
+            anim_t = double(f) / (animFrames - 1);
+            world = hittable_list();
+            lights = make_shared<hittable_list>();
+            test(world, lights);
+            node = bvh_node(world);
+            cam = camera(lookat + (start - lookat) * (1.0 - 0.15 * anim_t), lookat, vup, vfov, aperture, dist_to_focus);
+            cam.init(aspect_ratio);
+            accum.assign(3*nx*ny, 0.0);
+            samplesSoFar = 0;
+            passSamples = ns;
+            render_pass();
+            char name[64];
+            snprintf(name, sizeof name, "frames/anim_%04d.ppm", f);
+            std::ofstream out(name);
+            write_image_to(out, &image[0], nx, ny);
+            std::cerr << "\nanimation frame " << f + 1 << " / " << animFrames << std::endl;
+        }
+        return 0;
+    }
     std::cerr<<"GEN BVH"<<std::endl;
     node = bvh_node(world);
     
