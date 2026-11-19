@@ -3,6 +3,7 @@
 #include <functional>
 #include <iostream>
 #include <thread>
+#include <atomic>
 #include "general.h"
 #include "camera.h"
 #include "color.h"
@@ -503,7 +504,9 @@ int main(int argc, char **argv) {
     // std::cerr<< (double)cntnan/total<<std::endl;
 }
 int done = 0;
+std::atomic<uint64_t> rng_streams{0};
 void threadrun(int start, int end){
+    rng_seed(++rng_streams); // a fresh random stream for every thread of every pass
     // std::cerr<<"THREAD RAN"<<std::endl;
     for(int j=start ;j<end ;j++){
         for (int i = 0; i < nx; i++) {
