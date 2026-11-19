@@ -41,7 +41,7 @@ class triangle : public hittable{
             rec.set_face_normal(r, normal);
             rec.t = t;
             rec.p = r.at(t);
-            rec.mat_ptr = mp;
+            rec.mat_ptr = mp.get();
             rec.u = u;
             rec.v = v;
             triangle_uv(rec.p, rec.u, rec.v);

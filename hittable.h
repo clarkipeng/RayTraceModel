@@ -12,7 +12,7 @@ struct hit_record {
     double t;
     double u, v; //texcoord
     bool front_face;
-    shared_ptr<material> mat_ptr;
+    material* mat_ptr; // raw pointer: copying a shared_ptr on every hit test costs an atomic refcount update
     inline void set_face_normal(const ray& r, const vec3& outward_normal) {
         front_face = dot(r.direction(), outward_normal) < 0;
         normal = front_face ? outward_normal :-outward_normal;
