@@ -11,7 +11,8 @@ struct scatter_record{
     ray specular_ray;
     bool is_specular;
     vec3 attenuation;
-    shared_ptr<pdf> pdf_ptr;
+    pdf* pdf_ptr;
+    cos_pdf cos; // lambertian's pdf lives here, so scatter() does not allocate
 };
 
 
@@ -41,7 +42,8 @@ class lambertian : public material {
         ) const override {
             srec.is_specular = 0;
             srec.attenuation = albedo->value(rec.u, rec.v, rec.p);
-            srec.pdf_ptr = make_shared<cos_pdf>(rec.normal);
+            srec.cos = cos_pdf(rec.normal);
+            srec.pdf_ptr = &srec.cos;
             return 1;
         }
         virtual double scattering_pdf(

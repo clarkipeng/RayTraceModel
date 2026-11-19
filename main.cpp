@@ -263,7 +263,7 @@ hittable_list random_scene() {
     return world;
 }
 vec3 ray_color(const ray& r, const vec3& background, const hittable& world,
-    shared_ptr<hittable> lights,  int dep) {
+    const hittable* lights,  int dep) {
     hit_record rec;
     if(dep==0){
         return vec3(0,0,0);
@@ -281,8 +281,8 @@ vec3 ray_color(const ray& r, const vec3& background, const hittable& world,
     if(srec.is_specular){
         return srec.attenuation * ray_color(srec.specular_ray, background, world, lights, dep-1);
     }
-    auto light_ptr = make_shared<hittable_pdf>(lights, rec.p);
-    mixture_pdf p(light_ptr, srec.pdf_ptr);
+    hittable_pdf light_pdf(lights, rec.p);
+    mixture_pdf p(&light_pdf, srec.pdf_ptr);
     ray scattered(rec.p, p.generate(), r.time());
     double pdfv = p.value(scattered.direction());
     // if(pdfv)cerr<<"ERROR"<<std::endl;
@@ -310,8 +310,8 @@ vec3 ray_color(const ray& r, const vec3& background, const bvh_node& node,
         next = srec.attenuation * ray_color(srec.specular_ray, background, node, lights, dep-1);
     }
     else {
-        auto light_ptr = make_shared<hittable_pdf>(lights, rec.p);
-        mixture_pdf p(light_ptr, srec.pdf_ptr);
+        hittable_pdf light_pdf(lights.get(), rec.p);
+        mixture_pdf p(&light_pdf, srec.pdf_ptr);
         ray scattered(rec.p, p.generate(), r.time());
         double pdfv = p.value(scattered.direction());
 
@@ -512,7 +512,7 @@ void threadrun(int start, int end){
                 float u = float(i + random_double()) / float(nx);
                 float v = float(j + random_double()) / float(ny);
                 ray r = cam.get_ray(u, v);
-                vec3 c = ray_color(r, background, node, lights, mxdepth);
+                vec3 c = ray_color(r, background, node, lights.get(), mxdepth);
                 if (!c.hasNaN()) sum += c;
             }
             double *acc = &accum[3*(j*nx+i)];
@@ -583,7 +583,7 @@ void render(){
                 auto v = (j + random_double()) / (ny-1);
                 ray r = cam.get_ray(u, v);
                 
-                pixel_color += ray_color(r, background, node, lights, mxdepth);
+                pixel_color += ray_color(r, background, node, lights.get(), mxdepth);
             }
             write_color(std::cout, pixel_color, ns);
         }
