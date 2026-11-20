@@ -54,6 +54,7 @@ class vec3 {
             const auto s = 1e-8;
             return (fabs(e[0]) < s) && (fabs(e[1]) < s) && (fabs(e[2]) < s);
         }
+        double max_component() const { return std::fmax(e[0], std::fmax(e[1], e[2])); }
         bool hasNaN() const {
             return (e[0] != e[0]) || (e[1] != e[1]) || (e[2] != e[2]);
         }

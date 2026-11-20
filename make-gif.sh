@@ -11,6 +11,6 @@ i=0
 for p in $(cat "$tmp/pick"); do cp "$(printf '%s/frame_%04d.ppm' "$dir" "$p")" "$(printf '%s/g_%04d.ppm' "$tmp" "$i")"; i=$((i+1)); done
 last=$(printf '%s/g_%04d.ppm' "$tmp" $((i-1)))
 for k in $(seq 1 20); do cp "$last" "$(printf '%s/g_%04d.ppm' "$tmp" "$i")"; i=$((i+1)); done
-ffmpeg -loglevel error -y -framerate 12 -i "$tmp/g_%04d.ppm" -vf "scale=$width:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=256:stats_mode=full[p];[b][p]paletteuse=dither=sierra2_4a" -loop 0 "$out"
+"$(dirname "$0")/.deps/dl-ffmpeg/ffmpeg" -loglevel error -y -framerate 12 -i "$tmp/g_%04d.ppm" -vf "scale=$width:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=256:stats_mode=full[p];[b][p]paletteuse=dither=sierra2_4a" -loop 0 "$out"
 rm -rf "$tmp"
 echo "$out: $i frames"

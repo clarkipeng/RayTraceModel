@@ -10,3 +10,10 @@ This code uses multithreading and bounding volume hierarchies(bvhs) in order to 
 Some rendered images I made can be found in the "good images" folder.
 
 After using probability distribution functions(pdfs) to optimize light calculations, some materials in the material.h file may no longer be functional.
+
+## Building and rendering
+`./setup-deps.sh` downloads Assimp, Intel Open Image Denoise, CMake and a static ffmpeg into `.deps/` (nothing is installed system-wide); `./build.sh` builds `./raytrace`.
+
+Add `--denoise` to run Open Image Denoise on the result, so a low sample count is enough:
+- still: `./raytrace 10 1 1024 64 --denoise`
+- animation (slow push-in, sliding light): `mkdir -p frames; ./raytrace 10 1 512 64 --denoise 180`, then `./make-mp4.sh frames out.mp4 24`
