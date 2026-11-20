@@ -565,6 +565,7 @@ void render_pass(){
     done = 0;
     int numthreads = std::thread::hardware_concurrency();
     numthreads -= 2;
+    if (const char *cap = getenv("RT_THREADS")) numthreads = std::max(1, std::min(numthreads, atoi(cap))); // e.g. RT_THREADS=24 to leave cores free
     std::vector<std::thread> threads(numthreads);
     std::cerr<<"NUMTHREADS "<<numthreads<<std::endl;
     for(int t=0;t<numthreads;t++){
