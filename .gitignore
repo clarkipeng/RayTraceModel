@@ -2,3 +2,4 @@ raytrace
 frames/
 out-*/
 image.ppm
+.deps/
