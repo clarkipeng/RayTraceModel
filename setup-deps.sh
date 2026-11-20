@@ -1,6 +1,6 @@
 #!/bin/sh
 # Vendor the build dependencies project-locally in .deps (no system installs):
-# CMake (to build Assimp), Assimp, Intel Open Image Denoise, and a static ffmpeg for make-mp4.sh.
+# CMake (to build Assimp), Assimp, and a static ffmpeg for make-mp4.sh.
 set -e
 cd "$(dirname "$0")"
 mkdir -p .deps && cd .deps
@@ -14,9 +14,6 @@ if [ ! -d assimp/lib ]; then
      -DASSIMP_BUILD_TESTS=OFF -DASSIMP_BUILD_ASSIMP_TOOLS=OFF -DASSIMP_WARNINGS_AS_ERRORS=OFF \
      -DASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT=OFF -DASSIMP_BUILD_OBJ_IMPORTER=ON -DBUILD_SHARED_LIBS=ON
   $C --build dl-assimp/build -j"$(nproc)" && $C --install dl-assimp/build
-fi
-if [ ! -d dl-oidn/oidn-2.5.1.x86_64.linux ]; then
-  mkdir -p dl-oidn && curl -sL https://github.com/RenderKit/oidn/releases/download/v2.5.1/oidn-2.5.1.x86_64.linux.tar.gz | tar xz -C dl-oidn
 fi
 if [ ! -x dl-ffmpeg/ffmpeg ]; then
   mkdir -p dl-ffmpeg && curl -sL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz | tar xJ -C dl-ffmpeg --strip-components=1

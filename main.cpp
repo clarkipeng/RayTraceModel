@@ -15,7 +15,6 @@
 #include "constant_medium.h"
 #include "pdf.h"
 #include "triangle.h"
-#include "denoise.h"
 #include <chrono>
 #include <ctime>
 
@@ -48,6 +47,8 @@ void test(hittable_list &world, std::shared_ptr<hittable_list> &lights){
     world.add(make_shared<yz_rect>(-273, 273, -273, 273, -273, red));
     world.add(make_shared<flip_face>(make_shared<xz_rect>(-60 + dx, 60 + dx, -50, 50, 273, light1)));
     world.add(make_shared<xy_rect>(-273, 273, -273, 273, -273, blue));
+    // A mirror on the blue wall, so the backpack and the light show up reflected.
+    world.add(make_shared<xy_rect>(-190, 190, -200, 150, -272, make_shared<metal>(vec3(0.95), 0.0)));
     lights->add(make_shared<xz_rect>(-60 + dx, 60 + dx, -50, 50, 273, shared_ptr<material>()));
     world.add(make_shared<xz_rect>(-273, 273, -273, 273, -273, white));
     world.add(make_shared<xz_rect>(-273, 273, -273, 273, 273, white));
@@ -349,28 +350,8 @@ shared_ptr<hittable_list> lights = make_shared<hittable_list>();
 std::vector<uint8_t> image;
 std::vector<double> accum; // running sum of samples per pixel, for progressive frames
 int frames = 1, passSamples, samplesSoFar = 0;
-double sample_clamp = inf; // with --denoise, per-sample radiance is clamped to tame fireflies
-bool use_denoise = false; // --denoise: run Open Image Denoise on the converged image(s)
-
-// Guide images for the denoiser: albedo and normal at the first non-mirror surface along each pixel's centre ray.
-void guide_images(std::vector<float> &albedo, std::vector<float> &normal);
-
-// Rebuild `image` from the accumulated samples, denoising the linear-light average first.
-void denoise_image(int n) {
-    std::vector<float> rgb(accum.size()), albedo, normal;
-    for (size_t k = 0; k < rgb.size(); k++) rgb[k] = float(accum[k] / n);
-    guide_images(albedo, normal);
-    if (!denoise_rgb(rgb, nx, ny, &albedo, &normal)) return;
-    for (size_t k = 0; k < rgb.size(); k++) {
-        float c = rgb[k] > 0 ? std::sqrt(rgb[k]) : 0.f;
-        image[k] = int(255.999 * std::fmin(1.0f, c));
-    }
-}
 
 int main(int argc, char **argv) {
-    // --denoise may appear anywhere; strip it so the positional arguments keep their meaning.
-    for (int k = 1; k < argc; k++)
-        if (std::string(argv[k]) == "--denoise") { use_denoise = true; sample_clamp = 8.0; for (int m = k; m < argc; m++) argv[m] = argv[m+1]; argc--; k--; }
     int scene = argc > 1 ? atoi(argv[1]) : 0;
     if (argc > 2) frames = std::max(1, atoi(argv[2]));
     // Image
@@ -498,7 +479,6 @@ int main(int argc, char **argv) {
             samplesSoFar = 0;
             passSamples = ns;
             render_pass();
-            if (use_denoise) denoise_image(ns);
             char name[64];
             snprintf(name, sizeof name, "frames/anim_%04d.ppm", f);
             std::ofstream out(name);
@@ -524,26 +504,6 @@ int main(int argc, char **argv) {
     std::cerr <<nancount<< std::endl;
     // std::cerr<< (double)cntnan/total<<std::endl;
 }
-void guide_images(std::vector<float> &albedo, std::vector<float> &normal) {
-    albedo.assign(3*nx*ny, 0.f); normal.assign(3*nx*ny, 0.f);
-    for (int j = 0; j < ny; j++) for (int i = 0; i < nx; i++) {
-        ray r = cam.get_ray((i + 0.5) / nx, (j + 0.5) / ny);
-        float *a = &albedo[3*(j*nx+i)], *nn = &normal[3*(j*nx+i)];
-        for (int depth = 0; depth < 8; depth++) {
-            hit_record rec;
-            if (!node.hit(r, interval(0.001, inf), rec)) { for (int c = 0; c < 3; c++) a[c] = fmin(1.0, background[c]); break; }
-            scatter_record srec;
-            if (!rec.mat_ptr->scatter(r, rec, srec)) { // a light: its colour, clamped
-                vec3 e = rec.mat_ptr->emitted(r, rec, rec.u, rec.v, rec.p);
-                for (int c = 0; c < 3; c++) a[c] = fmin(1.0, e[c]);
-                break;
-            }
-            if (srec.is_specular && depth < 7) { r = srec.specular_ray; continue; }
-            for (int c = 0; c < 3; c++) { a[c] = fmin(1.0, srec.attenuation[c]); nn[c] = rec.normal[c]; }
-            break;
-        }
-    }
-}
 int done = 0;
 void threadrun(int start, int end){
     // std::cerr<<"THREAD RAN"<<std::endl;
@@ -555,7 +515,7 @@ void threadrun(int start, int end){
                 float v = float(j + random_double()) / float(ny);
                 ray r = cam.get_ray(u, v);
                 vec3 c = ray_color(r, background, node, lights, mxdepth);
-                if (!c.hasNaN()) { if (c.max_component() > sample_clamp) c = c * (sample_clamp / c.max_component()); sum += c; }
+                if (!c.hasNaN()) sum += c;
             }
             double *acc = &accum[3*(j*nx+i)];
             acc[0] += sum[0]; acc[1] += sum[1]; acc[2] += sum[2];
@@ -579,7 +539,7 @@ void render_pass();
 void multitreading_render(){
     accum.assign(3*nx*ny, 0.0);
     // frames == 1: one pass of ns samples, the original still.
-    if (frames == 1) { passSamples = ns; render_pass(); if (use_denoise) denoise_image(ns); write_image(&image[0], nx, ny); return; }
+    if (frames == 1) { passSamples = ns; render_pass(); write_image(&image[0], nx, ny); return; }
     // Otherwise: one sample per pixel per pass, saving the running average at `frames` checkpoints
     // spaced on a log scale from 1 to ns samples, so the GIF shows the noise clearing.
     passSamples = 1;
