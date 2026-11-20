@@ -41,6 +41,7 @@ class pdf{
 
 class cos_pdf : public pdf{
     public:
+        cos_pdf() {}
         cos_pdf(const vec3& normal) { uvw.build(normal); }
 
         virtual double value(const vec3& direction) const override{
@@ -57,7 +58,7 @@ class cos_pdf : public pdf{
 class hittable_pdf : public pdf {
     public:
     
-        hittable_pdf(shared_ptr<hittable> p, const vec3& origin) : ptr(p), o(origin) {}
+        hittable_pdf(const hittable* p, const vec3& origin) : ptr(p), o(origin) {}
 
         virtual double value(const vec3& direction) const override {
             return ptr->pdf_value(o, direction);
@@ -69,12 +70,12 @@ class hittable_pdf : public pdf {
 
     public:
         vec3 o;
-        shared_ptr<hittable> ptr;
+        const hittable* ptr;
 };
 
 class mixture_pdf : public pdf{
     public: 
-        mixture_pdf(shared_ptr<pdf> p0, shared_ptr<pdf> p1){
+        mixture_pdf(const pdf* p0, const pdf* p1){
             p[0]=p0;
             p[1]=p1;
         }
@@ -88,7 +89,7 @@ class mixture_pdf : public pdf{
             else return p[1]->generate();
         }
     public:
-        shared_ptr<pdf> p[2];
+        const pdf* p[2];
 };
 
 #endif

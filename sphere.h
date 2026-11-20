@@ -32,7 +32,7 @@ class sphere : public hittable {
             vec3 onormal = (rec.p - center) / radius;
             rec.set_face_normal(r, onormal);
             sphere_uv(onormal, rec.u, rec.v);
-            rec.mat_ptr = mp;
+            rec.mat_ptr = mp.get();
             return 1;
         }
         aabb bounding_box() const override { return bbox; }
