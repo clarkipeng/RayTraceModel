@@ -28,7 +28,7 @@ class xy_rect: public hittable{
             rec.t = t;
             auto onormal = vec3(0, 0, 1);
             rec.set_face_normal(r, onormal);
-            rec.mat_ptr = mp;
+            rec.mat_ptr = mp.get();
             rec.p = r.at(t);
             return 1;
         }
@@ -79,7 +79,7 @@ class xz_rect: public hittable{
             rec.t = t;
             auto outward_normal = vec3(0, 1, 0);
             rec.set_face_normal(r, outward_normal);
-            rec.mat_ptr = mp;
+            rec.mat_ptr = mp.get();
             rec.p = r.at(t);
             return 1;
         }
@@ -131,7 +131,7 @@ class yz_rect: public hittable{
             rec.t = t;
             auto outward_normal = vec3(1, 0, 0);
             rec.set_face_normal(r, outward_normal);
-            rec.mat_ptr = mp;
+            rec.mat_ptr = mp.get();
             rec.p = r.at(t);
             return 1;
         }
