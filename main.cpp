@@ -48,10 +48,10 @@ void test(hittable_list &world, std::shared_ptr<hittable_list> &lights){
     world.add(make_shared<yz_rect>(-273, 273, -273, 273, -273, red));
     world.add(make_shared<flip_face>(make_shared<xz_rect>(-60 + dx, 60 + dx, -50, 50, 273, light1)));
     world.add(make_shared<xy_rect>(-273, 273, -273, 273, -273, blue));
-    // Mirrors on the red and blue walls, each 83 from the ceiling and from both side walls.
+    // Facing mirrors on the blue and grey walls (a reflection corridor), each 83 from the ceiling and from both side walls.
     auto mirror = make_shared<metal>(vec3(0.95), 0.0);
     world.add(make_shared<xy_rect>(-190, 190, -200, 190, -272, mirror)); // blue wall
-    world.add(make_shared<yz_rect>(-200, 190, -190, 190, -272, mirror)); // red wall
+    world.add(make_shared<xy_rect>(-190, 190, -200, 190, 272, mirror)); // grey wall, behind the camera
     lights->add(make_shared<xz_rect>(-60 + dx, 60 + dx, -50, 50, 273, shared_ptr<material>()));
     world.add(make_shared<xz_rect>(-273, 273, -273, 273, -273, white));
     world.add(make_shared<xz_rect>(-273, 273, -273, 273, 273, white));
