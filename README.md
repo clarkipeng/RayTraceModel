@@ -14,4 +14,4 @@ After using probability distribution functions(pdfs) to optimize light calculati
 ## Building and the converging video
 `./setup-deps.sh` downloads Assimp, CMake and a static ffmpeg into `.deps/` (nothing is installed system-wide); `./build.sh` builds `./raytrace`.
 
-`mkdir -p frames; ./raytrace 10 150 512 1024` renders the backpack room (with a mirror) one sample per pixel at a time and saves the running average at log-spaced sample counts; `./make-mp4.sh frames out.mp4 20 frame` plays them, so you watch the rays accumulate and the image clear up.
+`mkdir -p frames; ./raytrace 10 150 512 1024` renders the backpack room (facing mirrors on the blue and grey walls) one sample per pixel at a time and saves the running average at log-spaced sample counts; `./make-mp4.sh frames out.mp4 20 frame` plays them, so you watch the rays accumulate and the image clear up.
