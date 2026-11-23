@@ -467,6 +467,9 @@ int main(int argc, char **argv) {
     if (const char *s = getenv("RT_VFOV")) vfov = atof(s);
     if (const char *s = getenv("RT_LOOKFROM")) sscanf(s, "%lf %lf %lf", &lookfrom[0], &lookfrom[1], &lookfrom[2]);
     if (const char *s = getenv("RT_LOOKAT")) sscanf(s, "%lf %lf %lf", &lookat[0], &lookat[1], &lookat[2]);
+    // Optional depth of field through the thin-lens camera: RT_APERTURE=8 RT_FOCUS=300 (focus defaults to the lookat distance).
+    if (const char *s = getenv("RT_APERTURE")) { aperture = atof(s); dist_to_focus = (lookat - lookfrom).length(); }
+    if (const char *s = getenv("RT_FOCUS")) dist_to_focus = atof(s);
     ny = static_cast<int>(nx / aspect_ratio);
 
     // ./raytrace 10 1 [width] [samples] [anim_frames]: a slow push-in while the light slides, one
