@@ -462,6 +462,11 @@ int main(int argc, char **argv) {
     // ./raytrace [scene] [frames] [width] [samples]: optional overrides of the scene's size and sample count.
     if (argc > 3) nx = atoi(argv[3]);
     if (argc > 4) ns = atoi(argv[4]);
+    // Optional camera overrides, e.g. RT_ASPECT=1.5 RT_LOOKFROM="270 150 270" RT_LOOKAT="0 0 0" RT_VFOV=50 for a 3:2 framing.
+    if (const char *s = getenv("RT_ASPECT")) aspect_ratio = atof(s);
+    if (const char *s = getenv("RT_VFOV")) vfov = atof(s);
+    if (const char *s = getenv("RT_LOOKFROM")) sscanf(s, "%lf %lf %lf", &lookfrom[0], &lookfrom[1], &lookfrom[2]);
+    if (const char *s = getenv("RT_LOOKAT")) sscanf(s, "%lf %lf %lf", &lookat[0], &lookat[1], &lookat[2]);
     ny = static_cast<int>(nx / aspect_ratio);
 
     // ./raytrace 10 1 [width] [samples] [anim_frames]: a slow push-in while the light slides, one
