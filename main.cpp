@@ -470,30 +470,43 @@ int main(int argc, char **argv) {
     // Optional depth of field through the thin-lens camera: RT_APERTURE=8 RT_FOCUS=300 (focus defaults to the lookat distance).
     if (const char *s = getenv("RT_APERTURE")) { aperture = atof(s); dist_to_focus = (lookat - lookfrom).length(); }
     if (const char *s = getenv("RT_FOCUS")) dist_to_focus = atof(s);
+    // Optional path depth, RT_MAXDEPTH=2..: light reaches the eye after depth - 1 bounces (2 = direct light only).
+    if (const char *s = getenv("RT_MAXDEPTH")) mxdepth = std::max(1, atoi(s));
     ny = static_cast<int>(nx / aspect_ratio);
 
     // ./raytrace 10 1 [width] [samples] [anim_frames]: a slow push-in while the light slides, one
     // converged frame per time step, written to frames/anim_NNNN.ppm (make-mp4.sh plays them).
+    // RT_ORBIT=360 instead circles the camera that many degrees around lookat, light fixed; frame
+    // anim_frames would equal frame 0, so a full turn loops. Frames already on disk are skipped (resume).
     int animFrames = argc > 5 ? atoi(argv[5]) : 0;
+    const char *orbit = getenv("RT_ORBIT");
     if (animFrames > 1 && scene == 10) {
         image.resize(3*nx*ny);
         vec3 start = lookfrom;
         for (int f = 0; f < animFrames; f++) {
-            anim_t = double(f) / (animFrames - 1);
+            char name[64];
+            snprintf(name, sizeof name, "frames/anim_%04d.ppm", f);
+            if (std::ifstream(name).good()) continue;
+            double t = double(f) / (animFrames - 1);
+            anim_t = orbit ? -1 : t;
             world = hittable_list();
             lights = make_shared<hittable_list>();
             test(world, lights);
             node = bvh_node(world);
-            cam = camera(lookat + (start - lookat) * (1.0 - 0.15 * anim_t), lookat, vup, vfov, aperture, dist_to_focus);
+            vec3 eye = lookat + (start - lookat) * (1.0 - 0.15 * t);
+            if (orbit) {
+                double a = radians(atof(orbit) * f / animFrames), dx = start.x() - lookat.x(), dz = start.z() - lookat.z();
+                eye = lookat + vec3(cos(a) * dx + sin(a) * dz, start.y() - lookat.y(), -sin(a) * dx + cos(a) * dz);
+            }
+            cam = camera(eye, lookat, vup, vfov, aperture, dist_to_focus);
             cam.init(aspect_ratio);
             accum.assign(3*nx*ny, 0.0);
             samplesSoFar = 0;
             passSamples = ns;
             render_pass();
-            char name[64];
-            snprintf(name, sizeof name, "frames/anim_%04d.ppm", f);
-            std::ofstream out(name);
-            write_image_to(out, &image[0], nx, ny);
+            std::string part = std::string(name) + ".part"; // renamed when complete, so resume never sees half a frame
+            { std::ofstream out(part); write_image_to(out, &image[0], nx, ny); }
+            std::rename(part.c_str(), name);
             std::cerr << "\nanimation frame " << f + 1 << " / " << animFrames << std::endl;
         }
         return 0;
