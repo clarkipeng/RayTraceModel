@@ -37,18 +37,18 @@ public:
         processNode(scene->mRootNode, scene);
     }
     hittable_list getHittableList(){
+        // The model is turned 80 degrees about y; baking that into the vertices once spares
+        // a ray transform at every triangle test (same geometry as wrapping each in rotate_).
+        double a = radians(80), c = cos(a), s = sin(a);
+        auto turn = [&](vec3 p) { p = scale * p; return vec3(c*p.x() + s*p.z(), p.y(), -s*p.x() + c*p.z()); };
         hittable_list triangles;
         for(auto m: meshes){
             for(int i = 0; i<m.indices.size(); i+=3){
-                triangles.add(std::make_shared<rotate_>(std::make_shared<triangle>
-                    (
-                    scale*m.vertices[m.indices[i+0]],
-                    scale*m.vertices[m.indices[i+1]],
-                    scale*m.vertices[m.indices[i+2]],
-                    mtr
-                    ),
-                    0, 80, 0
-                ));
+                triangles.add(std::make_shared<triangle>(
+                    turn(m.vertices[m.indices[i+0]]),
+                    turn(m.vertices[m.indices[i+1]]),
+                    turn(m.vertices[m.indices[i+2]]),
+                    mtr));
             }
         }
         return triangles;
