@@ -528,10 +528,10 @@ int main(int argc, char **argv) {
     std::cerr <<nancount<< std::endl;
     // std::cerr<< (double)cntnan/total<<std::endl;
 }
-int done = 0;
-void threadrun(int start, int end){
-    // std::cerr<<"THREAD RAN"<<std::endl;
-    for(int j=start ;j<end ;j++){
+std::atomic<int> done{0}, nextRow{0};
+void threadrun(){
+    // Threads pull rows one at a time, so the rows through the model don't leave other threads idle.
+    for(int j; (j = nextRow++) < ny;){
         for (int i = 0; i < nx; i++) {
             vec3 sum(0.0);
             for (int s=0; s < passSamples; s++) {
@@ -583,18 +583,13 @@ void multitreading_render(){
     }
 }
 void render_pass(){
-    done = 0;
+    done = 0; nextRow = 0;
     int numthreads = std::thread::hardware_concurrency();
     numthreads -= 2;
     if (const char *cap = getenv("RT_THREADS")) numthreads = std::max(1, std::min(numthreads, atoi(cap))); // e.g. RT_THREADS=24 to leave cores free
     std::vector<std::thread> threads(numthreads);
     std::cerr<<"NUMTHREADS "<<numthreads<<std::endl;
-    for(int t=0;t<numthreads;t++){
-        int start = t*ny/numthreads;
-        int end = (t+1)*ny/numthreads;
-        if(t==numthreads-1)end = ny;
-        threads[t] = std::thread(threadrun, start, end);
-    }
+    for(int t=0;t<numthreads;t++) threads[t] = std::thread(threadrun);
     for (int t = 0; t < numthreads; ++t) {
         threads[t].join();
     }
