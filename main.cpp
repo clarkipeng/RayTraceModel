@@ -476,8 +476,8 @@ int main(int argc, char **argv) {
 
     // ./raytrace 10 1 [width] [samples] [anim_frames]: a slow push-in while the light slides, one
     // converged frame per time step, written to frames/anim_NNNN.ppm (make-mp4.sh plays them).
-    // RT_ORBIT=360 instead circles the camera that many degrees around lookat, light fixed; frame
-    // anim_frames would equal frame 0, so a full turn loops. Frames already on disk are skipped (resume).
+    // RT_ORBIT="from to" instead swings the camera around lookat from one angle (degrees) to the other,
+    // eased at both ends, light fixed; played forward then back it loops. Frames on disk are skipped (resume).
     int animFrames = argc > 5 ? atoi(argv[5]) : 0;
     const char *orbit = getenv("RT_ORBIT");
     if (animFrames > 1 && scene == 10) {
@@ -495,7 +495,9 @@ int main(int argc, char **argv) {
             node = bvh_node(world);
             vec3 eye = lookat + (start - lookat) * (1.0 - 0.15 * t);
             if (orbit) {
-                double a = radians(atof(orbit) * f / animFrames), dx = start.x() - lookat.x(), dz = start.z() - lookat.z();
+                double a0 = 0, a1 = 0;
+                sscanf(orbit, "%lf %lf", &a0, &a1);
+                double a = radians(a0 + (a1 - a0) * (1 - cos(pi * t)) / 2), dx = start.x() - lookat.x(), dz = start.z() - lookat.z();
                 eye = lookat + vec3(cos(a) * dx + sin(a) * dz, start.y() - lookat.y(), -sin(a) * dx + cos(a) * dz);
             }
             cam = camera(eye, lookat, vup, vfov, aperture, dist_to_focus);
