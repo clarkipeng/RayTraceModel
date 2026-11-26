@@ -531,6 +531,9 @@ int main(int argc, char **argv) {
     // std::cerr<< (double)cntnan/total<<std::endl;
 }
 std::atomic<int> done{0}, nextRow{0};
+// RT_CLAMP=8 caps each sample's radiance: rare bright caustic paths (light via a mirror onto a wall)
+// stop showing as white specks at low sample counts, at the cost of slightly dimmer caustics.
+const double sampleClamp = getenv("RT_CLAMP") ? atof(getenv("RT_CLAMP")) : 0;
 void threadrun(){
     // Threads pull rows one at a time, so the rows through the model don't leave other threads idle.
     for(int j; (j = nextRow++) < ny;){
@@ -541,7 +544,9 @@ void threadrun(){
                 float v = float(j + random_double()) / float(ny);
                 ray r = cam.get_ray(u, v);
                 vec3 c = ray_color(r, background, node, lights.get(), mxdepth);
-                if (!c.hasNaN()) sum += c;
+                if (c.hasNaN()) continue;
+                if (sampleClamp > 0) c = vec3(fmin(c[0], sampleClamp), fmin(c[1], sampleClamp), fmin(c[2], sampleClamp));
+                sum += c;
             }
             double *acc = &accum[3*(j*nx+i)];
             acc[0] += sum[0]; acc[1] += sum[1]; acc[2] += sum[2];
