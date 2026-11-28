@@ -63,7 +63,7 @@ encode() { # encode accum|bounces
     CHAIN="[0]$S[a];[1]$S[b];[2]$S[c];[3]$S[d];[4]$S[o];[5]$S[z];[a][b]xfade=fade:duration=0.25:offset=0.75[ab];[ab][c]xfade=fade:duration=0.25:offset=1.5[abc];[abc][d]xfade=fade:duration=0.25:offset=2.25[abcd];[abcd][o]xfade=fade:duration=0.25:offset=3[ao]"
   fi
   ffmpeg -v error -y $IN -framerate 30 -i "$tmp/s_%04d.ppm" -loop 1 -framerate 30 -t 0.3 -i "$first" \
-    -filter_complex "$CHAIN;[ao][z]xfade=fade:duration=0.25:offset=$(echo "$start + $orbit - 0.25" | bc -l),format=yuv420p[v]" \
+    -filter_complex "$CHAIN;[ao][z]xfade=fade:duration=0.25:offset=$(echo "$start + $orbit - 0.25" | bc -l),format=yuv420p,setparams=color_primaries=bt709:color_trc=bt709[v]" \
     -map "[v]" $ENC "$W/$1.mp4"
   rm -rf "$tmp"; echo "$W/$1.mp4"
 }
