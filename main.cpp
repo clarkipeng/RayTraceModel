@@ -574,6 +574,17 @@ void multitreading_render(){
     // Otherwise: one sample per pixel per pass, saving the running average at `frames` checkpoints
     // spaced on a log scale from 1 to ns samples, so the GIF shows the noise clearing.
     passSamples = 1;
+    // RT_CHECKPOINTS=file of increasing spp counts instead: one frame saved at each, for a hand-timed converge.
+    if (const char *f = getenv("RT_CHECKPOINTS")) {
+        std::ifstream in(f); std::vector<int> cps; for (int c; in >> c;) cps.push_back(c);
+        for (size_t k = 0; k < cps.size(); k++) {
+            while (samplesSoFar < cps[k]) { render_pass(); samplesSoFar += passSamples; }
+            char name[64]; snprintf(name, sizeof name, "frames/frame_%04d.ppm", (int)k);
+            std::ofstream out(name); write_image_to(out, &image[0], nx, ny);
+            std::cerr << "\nframe " << k << " (" << samplesSoFar << " spp)" << std::endl;
+        }
+        return;
+    }
     int saved = 0, written = 0; // checkpoints reached, frames written
     while (samplesSoFar < ns) {
         render_pass();
