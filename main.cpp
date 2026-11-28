@@ -487,6 +487,7 @@ int main(int argc, char **argv) {
             char name[64];
             snprintf(name, sizeof name, "frames/anim_%04d.ppm", f);
             if (std::ifstream(name).good()) continue;
+            if (const char *r = getenv("RT_FRAMES")) { int a = 0, b = 0; sscanf(r, "%d %d", &a, &b); if (f < a || f > b) continue; } // render only frames a..b
             double t = double(f) / (animFrames - 1);
             anim_t = orbit ? -1 : t;
             world = hittable_list();
