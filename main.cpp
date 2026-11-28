@@ -470,30 +470,46 @@ int main(int argc, char **argv) {
     // Optional depth of field through the thin-lens camera: RT_APERTURE=8 RT_FOCUS=300 (focus defaults to the lookat distance).
     if (const char *s = getenv("RT_APERTURE")) { aperture = atof(s); dist_to_focus = (lookat - lookfrom).length(); }
     if (const char *s = getenv("RT_FOCUS")) dist_to_focus = atof(s);
+    // Optional path depth, RT_MAXDEPTH=2..: light reaches the eye after depth - 1 bounces (2 = direct light only).
+    if (const char *s = getenv("RT_MAXDEPTH")) mxdepth = std::max(1, atoi(s));
     ny = static_cast<int>(nx / aspect_ratio);
 
     // ./raytrace 10 1 [width] [samples] [anim_frames]: a slow push-in while the light slides, one
     // converged frame per time step, written to frames/anim_NNNN.ppm (make-mp4.sh plays them).
+    // RT_ORBIT="from to" instead swings the camera around lookat from one angle (degrees) to the other,
+    // eased at both ends, light fixed; played forward then back it loops. Frames on disk are skipped (resume).
     int animFrames = argc > 5 ? atoi(argv[5]) : 0;
+    const char *orbit = getenv("RT_ORBIT");
     if (animFrames > 1 && scene == 10) {
         image.resize(3*nx*ny);
         vec3 start = lookfrom;
         for (int f = 0; f < animFrames; f++) {
-            anim_t = double(f) / (animFrames - 1);
+            char name[64];
+            snprintf(name, sizeof name, "frames/anim_%04d.ppm", f);
+            if (std::ifstream(name).good()) continue;
+            if (const char *r = getenv("RT_FRAMES")) { int a = 0, b = 0; sscanf(r, "%d %d", &a, &b); if (f < a || f > b) continue; } // render only frames a..b
+            double t = double(f) / (animFrames - 1);
+            anim_t = orbit ? -1 : t;
             world = hittable_list();
             lights = make_shared<hittable_list>();
             test(world, lights);
             node = bvh_node(world);
-            cam = camera(lookat + (start - lookat) * (1.0 - 0.15 * anim_t), lookat, vup, vfov, aperture, dist_to_focus);
+            vec3 eye = lookat + (start - lookat) * (1.0 - 0.15 * t);
+            if (orbit) {
+                double a0 = 0, a1 = 0;
+                sscanf(orbit, "%lf %lf", &a0, &a1);
+                double a = radians(a0 + (a1 - a0) * (1 - cos(pi * t)) / 2), dx = start.x() - lookat.x(), dz = start.z() - lookat.z();
+                eye = lookat + vec3(cos(a) * dx + sin(a) * dz, start.y() - lookat.y(), -sin(a) * dx + cos(a) * dz);
+            }
+            cam = camera(eye, lookat, vup, vfov, aperture, dist_to_focus);
             cam.init(aspect_ratio);
             accum.assign(3*nx*ny, 0.0);
             samplesSoFar = 0;
             passSamples = ns;
             render_pass();
-            char name[64];
-            snprintf(name, sizeof name, "frames/anim_%04d.ppm", f);
-            std::ofstream out(name);
-            write_image_to(out, &image[0], nx, ny);
+            std::string part = std::string(name) + ".part"; // renamed when complete, so resume never sees half a frame
+            { std::ofstream out(part); write_image_to(out, &image[0], nx, ny); }
+            std::rename(part.c_str(), name);
             std::cerr << "\nanimation frame " << f + 1 << " / " << animFrames << std::endl;
         }
         return 0;
@@ -515,10 +531,13 @@ int main(int argc, char **argv) {
     std::cerr <<nancount<< std::endl;
     // std::cerr<< (double)cntnan/total<<std::endl;
 }
-int done = 0;
-void threadrun(int start, int end){
-    // std::cerr<<"THREAD RAN"<<std::endl;
-    for(int j=start ;j<end ;j++){
+std::atomic<int> done{0}, nextRow{0};
+// RT_CLAMP=8 caps each sample's radiance: rare bright caustic paths (light via a mirror onto a wall)
+// stop showing as white specks at low sample counts, at the cost of slightly dimmer caustics.
+const double sampleClamp = getenv("RT_CLAMP") ? atof(getenv("RT_CLAMP")) : 0;
+void threadrun(){
+    // Threads pull rows one at a time, so the rows through the model don't leave other threads idle.
+    for(int j; (j = nextRow++) < ny;){
         for (int i = 0; i < nx; i++) {
             vec3 sum(0.0);
             for (int s=0; s < passSamples; s++) {
@@ -526,7 +545,9 @@ void threadrun(int start, int end){
                 float v = float(j + random_double()) / float(ny);
                 ray r = cam.get_ray(u, v);
                 vec3 c = ray_color(r, background, node, lights.get(), mxdepth);
-                if (!c.hasNaN()) sum += c;
+                if (c.hasNaN()) continue;
+                if (sampleClamp > 0) c = vec3(fmin(c[0], sampleClamp), fmin(c[1], sampleClamp), fmin(c[2], sampleClamp));
+                sum += c;
             }
             double *acc = &accum[3*(j*nx+i)];
             acc[0] += sum[0]; acc[1] += sum[1]; acc[2] += sum[2];
@@ -554,6 +575,17 @@ void multitreading_render(){
     // Otherwise: one sample per pixel per pass, saving the running average at `frames` checkpoints
     // spaced on a log scale from 1 to ns samples, so the GIF shows the noise clearing.
     passSamples = 1;
+    // RT_CHECKPOINTS=file of increasing spp counts instead: one frame saved at each, for a hand-timed converge.
+    if (const char *f = getenv("RT_CHECKPOINTS")) {
+        std::ifstream in(f); std::vector<int> cps; for (int c; in >> c;) cps.push_back(c);
+        for (size_t k = 0; k < cps.size(); k++) {
+            while (samplesSoFar < cps[k]) { render_pass(); samplesSoFar += passSamples; }
+            char name[64]; snprintf(name, sizeof name, "frames/frame_%04d.ppm", (int)k);
+            std::ofstream out(name); write_image_to(out, &image[0], nx, ny);
+            std::cerr << "\nframe " << k << " (" << samplesSoFar << " spp)" << std::endl;
+        }
+        return;
+    }
     int saved = 0, written = 0; // checkpoints reached, frames written
     while (samplesSoFar < ns) {
         render_pass();
@@ -570,18 +602,13 @@ void multitreading_render(){
     }
 }
 void render_pass(){
-    done = 0;
+    done = 0; nextRow = 0;
     int numthreads = std::thread::hardware_concurrency();
     numthreads -= 2;
     if (const char *cap = getenv("RT_THREADS")) numthreads = std::max(1, std::min(numthreads, atoi(cap))); // e.g. RT_THREADS=24 to leave cores free
     std::vector<std::thread> threads(numthreads);
     std::cerr<<"NUMTHREADS "<<numthreads<<std::endl;
-    for(int t=0;t<numthreads;t++){
-        int start = t*ny/numthreads;
-        int end = (t+1)*ny/numthreads;
-        if(t==numthreads-1)end = ny;
-        threads[t] = std::thread(threadrun, start, end);
-    }
+    for(int t=0;t<numthreads;t++) threads[t] = std::thread(threadrun);
     for (int t = 0; t < numthreads; ++t) {
         threads[t].join();
     }
